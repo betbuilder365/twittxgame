@@ -105,14 +105,8 @@
             vy += gravity;
             playerY += vy;
 
-            // Check for ground collision
-            if (playerY + playerHeight > gameHeight) {
-                playerY = gameHeight - playerHeight;
-                vy = 0;
-                grounded = true;
-            } else {
-                grounded = false;
-            }
+            // Reset grounded state
+            grounded = false;
 
             // Check for platform collisions (only when falling)
             if (vy > 0) {
@@ -126,6 +120,13 @@
                         grounded = true;
                     }
                 });
+            }
+
+            // Check for ground collision
+            if (playerY + playerHeight > gameHeight) {
+                playerY = gameHeight - playerHeight;
+                vy = 0;
+                grounded = true;
             }
 
             // Handle jumping
