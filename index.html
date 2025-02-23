@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Vertical Jump Game with Super Jump</title>
+    <title>2D Vertical Jump Game with Auto-Landing and Smooth Motion</title>
     <style>
         body {
             margin: 0;
@@ -29,7 +29,7 @@
             border-radius: 5px;
             bottom: 50px; /* Start position */
             left: 50px;
-            transition: all 0.1s; /* Smooth movement for non-animation properties */
+            transition: all 0.1s linear; /* Smooth movement for all properties */
         }
 
         /* Jumping animation (normal jump) */
@@ -54,7 +54,7 @@
                 transform: translateY(0) scaleY(1) rotate(0deg);
             }
             30% {
-                transform: translateY(-150px) scaleY(0.7) rotate(-15deg); /* Higher peak, more squash, more rotation */
+                transform: translateY(-150px) scaleY(0.7) rotate(-15deg); /* Higher peak */
             }
             70% {
                 transform: translateY(-150px) scaleY(0.7) rotate(15deg);
@@ -119,6 +119,7 @@
         let superJumpStrength = -40; // Stronger jump for super jump
         let velocity = 0;
         let playerLeft = 50; // Player's horizontal position (left in pixels)
+        let targetPlatform = null; // Track the target platform for auto-landing
 
         // Movement speed
         const moveSpeed = 5;
@@ -138,9 +139,11 @@
             } else if (event.key === 'ArrowLeft' && playerLeft > 0) { // Move left
                 playerLeft -= moveSpeed;
                 player.style.left = playerLeft + 'px';
+                adjustDuringJump(); // Adjust horizontal position during jump if moving
             } else if (event.key === 'ArrowRight' && playerLeft < gameArea.offsetWidth - player.offsetWidth) { // Move right
                 playerLeft += moveSpeed;
                 player.style.left = playerLeft + 'px';
+                adjustDuringJump(); // Adjust horizontal position during jump if moving
             } else if (event.key === 'ArrowUp' && position < gameArea.offsetHeight - player.offsetHeight) { // Move up
                 position += moveSpeed;
                 player.style.bottom = position + 'px';
@@ -203,9 +206,11 @@
                 if (deltaX > minSwipeDistance && playerLeft < gameArea.offsetWidth - player.offsetWidth) { // Swipe right
                     playerLeft += moveSpeed;
                     player.style.left = playerLeft + 'px';
+                    adjustDuringJump(); // Adjust horizontal position during jump if moving
                 } else if (deltaX < -minSwipeDistance && playerLeft > 0) { // Swipe left
                     playerLeft -= moveSpeed;
                     player.style.left = playerLeft + 'px';
+                    adjustDuringJump(); // Adjust horizontal position during jump if moving
                 }
             } else {
                 // Vertical swipe
@@ -224,6 +229,7 @@
             velocity = normalJumpStrength;
             player.classList.add('jumping'); // Add normal jump animation
             player.classList.remove('super-jumping'); // Ensure no super jump animation
+            findTargetPlatform(); // Set target platform for auto-landing
         }
 
         function performSuperJump() {
@@ -231,6 +237,62 @@
             velocity = superJumpStrength; // Higher jump strength
             player.classList.add('super-jumping'); // Add super jump animation
             player.classList.remove('jumping'); // Ensure no normal jump animation
+            findTargetPlatform(); // Set target platform for auto-landing
+        }
+
+        function findTargetPlatform() {
+            const platforms = document.querySelectorAll('.platform');
+            let closestPlatform = null;
+            let minDistance = Infinity;
+            const playerRect = player.getBoundingClientRect();
+
+            platforms.forEach(platform => {
+                const platformStyle = window.getComputedStyle(platform);
+                const platformLeft = parseFloat(platformStyle.left);
+                const platformBottom = parseFloat(platformStyle.bottom);
+                const platformWidth = platform.offsetWidth;
+                const platformHeight = platform.offsetHeight;
+
+                const platformRect = {
+                    left: platformLeft,
+                    right: platformLeft + platformWidth,
+                    top: gameArea.offsetHeight - platformBottom - platformHeight,
+                    bottom: gameArea.offsetHeight - platformBottom
+                };
+
+                // Calculate vertical distance to the platform (only if above current position)
+                if (platformRect.top > playerRect.bottom) {
+                    const verticalDistance = platformRect.top - playerRect.bottom;
+                    const horizontalDistance = Math.abs((playerRect.left + playerRect.width / 2) - (platformRect.left + platformWidth / 2));
+                    const totalDistance = verticalDistance + horizontalDistance;
+
+                    if (totalDistance < minDistance) {
+                        minDistance = totalDistance;
+                        closestPlatform = platform;
+                    }
+                }
+            });
+
+            targetPlatform = closestPlatform;
+        }
+
+        function adjustDuringJump() {
+            if (isJumping && targetPlatform) {
+                const platformStyle = window.getComputedStyle(targetPlatform);
+                const platformLeft = parseFloat(platformStyle.left);
+                const platformWidth = targetPlatform.offsetWidth;
+                const targetCenter = platformLeft + platformWidth / 2;
+                const playerCenter = playerLeft + player.offsetWidth / 2;
+
+                // Smoothly adjust horizontal position to align with target platform's center
+                const maxHorizontalSpeed = 3; // Limit speed for smooth movement
+                if (playerCenter < targetCenter - 10) { // Move right if too far left
+                    playerLeft += Math.min(maxHorizontalSpeed, targetCenter - playerCenter);
+                } else if (playerCenter > targetCenter + 10) { // Move left if too far right
+                    playerLeft -= Math.min(maxHorizontalSpeed, playerCenter - targetCenter);
+                }
+                player.style.left = playerLeft + 'px';
+            }
         }
 
         function updateGame() {
@@ -243,7 +305,8 @@
                 position = 50;
                 velocity = 0;
                 isJumping = false;
-                player.classList.remove('jumping', 'super-jumping'); // Remove all jump animations when landed
+                targetPlatform = null; // Reset target when landing on ground
+                player.classList.remove('jumping', 'super-jumping'); // Remove all jump animations
             } else if (position < 0) { // Upper boundary
                 position = 0;
                 velocity = 0;
@@ -252,8 +315,10 @@
             // Update player position
             player.style.bottom = position + 'px';
 
-            // Check collision with platforms (updated for moving platforms)
+            // Check collision with platforms (updated for moving platforms and auto-landing)
             const platforms = document.querySelectorAll('.platform');
+            let landed = false;
+
             platforms.forEach(platform => {
                 const platformStyle = window.getComputedStyle(platform);
                 const platformLeft = parseFloat(platformStyle.left);
@@ -279,10 +344,17 @@
                     position = platformRect.top - playerRect.height;
                     velocity = 0;
                     isJumping = false;
-                    player.classList.remove('jumping', 'super-jumping'); // Remove all jump animations when landed on platform
+                    targetPlatform = null; // Reset target when landing
+                    landed = true;
+                    player.classList.remove('jumping', 'super-jumping'); // Remove all jump animations
                     player.style.bottom = position + 'px';
                 }
             });
+
+            // If no platform collision and target exists, adjust horizontal position during jump
+            if (isJumping && !landed && targetPlatform) {
+                adjustDuringJump();
+            }
 
             requestAnimationFrame(updateGame);
         }
