@@ -1,148 +1,149 @@
-<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>2D Platformer Game</title>
-  <style>
-    #game-container {
-      position: relative;
-      width: 800px;
-      height: 600px;
-      background-color: lightblue;
-      overflow: hidden;
-    }
-
-    #player {
-      position: absolute;
-      width: 50px;
-      height: 50px;
-      background-color: red;
-      left: 100px;
-      top: 500px;
-    }
-
-    .platform {
-      position: absolute;
-      background-color: green;
-    }
-
-    #ground {
-      left: 0;
-      top: 550px;
-      width: 800px;
-      height: 50px;
-    }
-  </style>
+    <title>Basic 2D Vertical Game</title>
+    <style>
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background-color: #eee;
+            margin: 0 auto; /* Center the game area */
+        }
+        #player {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+        }
+        .platform {
+            position: absolute;
+            width: 100px;
+            height: 10px;
+            background-color: blue;
+        }
+    </style>
 </head>
 <body>
-  <div id="game-container">
-    <div id="player"></div>
-    <div class="platform" id="ground"></div>
-  </div>
+    <div id="game-container">
+        <div id="player"></div>
+        <div class="platform" style="left: 100px; top: 500px;"></div>
+        <div class="platform" style="left: 200px; top: 400px;"></div>
+        <div class="platform" style="left: 150px; top: 300px;"></div>
+    </div>
+    <script>
+        // DOM elements
+        const gameContainer = document.querySelector('#game-container');
+        const player = document.querySelector('#player');
+        const platformElements = document.querySelectorAll('.platform');
 
-  <script>
-    // Get DOM elements
-    let player = document.getElementById('player');
-    let platforms = document.querySelectorAll('.platform');
+        // Game dimensions
+        const gameWidth = gameContainer.offsetWidth;
+        const gameHeight = gameContainer.offsetHeight;
+        const playerWidth = player.offsetWidth;
+        const playerHeight = player.offsetHeight;
 
-    // Player state
-    let playerX = 100;  // Initial x position
-    let playerY = 500;  // Initial y position
-    let vx = 0;         // Horizontal velocity
-    let vy = 0;         // Vertical velocity
-    let onGround = false;
+        // Player state
+        let playerX = gameWidth / 2 - playerWidth / 2; // Center horizontally
+        let playerY = gameHeight - playerHeight;       // Bottom of the screen
+        let vx = 0;  // Horizontal velocity
+        let vy = 0;  // Vertical velocity
+        const gravity = 0.5;    // Gravity strength
+        const jumpSpeed = 10;   // Initial jump velocity
+        const moveSpeed = 5;    // Horizontal movement speed
+        let grounded = true;    // Whether player can jump
 
-    // Game constants
-    const gravity = 0.5;    // Gravity strength
-    const speed = 5;        // Horizontal movement speed
-    const jumpSpeed = -10;  // Jump velocity (negative to move up)
+        // Key states
+        let leftPressed = false;
+        let rightPressed = false;
+        let spacePressed = false;
 
-    // Key states
-    let keys = { left: false, right: false, jump: false };
+        // Platform data
+        const platforms = Array.from(platformElements).map(plat => ({
+            x: plat.offsetLeft,
+            y: plat.offsetTop,
+            width: plat.offsetWidth,
+            height: plat.offsetHeight
+        }));
 
-    // Handle key presses
-    document.addEventListener('keydown', (e) => {
-      if (e.keyCode === 37) keys.left = true;    // Left arrow
-      else if (e.keyCode === 39) keys.right = true; // Right arrow
-      else if (e.keyCode === 32) keys.jump = true;  // Spacebar
-    });
+        // Initialize player position
+        player.style.left = playerX + 'px';
+        player.style.top = playerY + 'px';
 
-    document.addEventListener('keyup', (e) => {
-      if (e.keyCode === 37) keys.left = false;
-      else if (e.keyCode === 39) keys.right = false;
-      else if (e.keyCode === 32) keys.jump = false;
-    });
+        // Keyboard input
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = true;
+            if (e.key === 'ArrowRight') rightPressed = true;
+            if (e.key === ' ') spacePressed = true;
+        });
 
-    // Game loop
-    function gameLoop() {
-      // Handle horizontal movement
-      if (keys.left) {
-        vx = -speed;
-      } else if (keys.right) {
-        vx = speed;
-      } else {
-        vx = 0;
-      }
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = false;
+            if (e.key === 'ArrowRight') rightPressed = false;
+            if (e.key === ' ') spacePressed = false;
+        });
 
-      // Apply gravity
-      vy += gravity;
+        // Game loop
+        function gameLoop() {
+            // Horizontal movement
+            if (leftPressed && !rightPressed) {
+                vx = -moveSpeed;
+            } else if (rightPressed && !leftPressed) {
+                vx = moveSpeed;
+            } else {
+                vx = 0;
+            }
+            playerX += vx;
 
-      // Handle jump
-      if (keys.jump && onGround) {
-        vy = jumpSpeed;
-      }
+            // Keep player within horizontal bounds
+            if (playerX < 0) playerX = 0;
+            if (playerX > gameWidth - playerWidth) playerX = gameWidth - playerWidth;
 
-      // Store previous position for collision detection
-      let prevY = playerY;
+            // Store previous Y position for collision
+            const prevY = playerY;
 
-      // Update position
-      playerX += vx;
-      playerY += vy;
+            // Apply gravity
+            vy += gravity;
+            playerY += vy;
 
-      // Reset ground state
-      onGround = false;
+            // Check for ground collision
+            if (playerY + playerHeight > gameHeight) {
+                playerY = gameHeight - playerHeight;
+                vy = 0;
+                grounded = true;
+            } else {
+                grounded = false;
+            }
 
-      // Check collisions with platforms
-      platforms.forEach(platform => {
-        let platformX = parseFloat(platform.style.left);
-        let platformY = parseFloat(platform.style.top);
-        let platformWidth = parseFloat(platform.style.width);
-        let platformHeight = parseFloat(platform.style.height);
+            // Check for platform collisions (only when falling)
+            if (vy > 0) {
+                platforms.forEach(platform => {
+                    if (playerX < platform.x + platform.width &&
+                        playerX + playerWidth > platform.x &&
+                        prevY + playerHeight <= platform.y &&
+                        playerY + playerHeight > platform.y) {
+                        playerY = platform.y - playerHeight;
+                        vy = 0;
+                        grounded = true;
+                    }
+                });
+            }
 
-        // Check if player intersects with platform
-        if (playerX < platformX + platformWidth &&
-            playerX + 50 > platformX &&
-            playerY < platformY + platformHeight &&
-            playerY + 50 > platformY) {
-          // Check if player was above platform in previous frame
-          if (prevY + 50 <= platformY) {
-            playerY = platformY - 50; // Land on platform
-            vy = 0;
-            onGround = true;
-          }
+            // Handle jumping
+            if (spacePressed && grounded) {
+                vy = -jumpSpeed;
+                grounded = false;
+            }
+
+            // Update player position in DOM
+            player.style.left = playerX + 'px';
+            player.style.top = playerY + 'px';
+
+            // Continue the game loop
+            requestAnimationFrame(gameLoop);
         }
-      });
 
-      // Keep player within game boundaries
-      if (playerX < 0) playerX = 0;
-      if (playerX > 800 - 50) playerX = 800 - 50;
-      if (playerY > 600 - 50) {
-        playerY = 600 - 50;
-        vy = 0;
-        onGround = true;
-      }
-
-      // Update player position in DOM
-      player.style.left = playerX + 'px';
-      player.style.top = playerY + 'px';
-
-      // Continue game loop
-      requestAnimationFrame(gameLoop);
-    }
-
-    // Start the game
-    gameLoop();
-  </script>
+        // Start the game
+        gameLoop();
+    </script>
 </body>
 </html>
