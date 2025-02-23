@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Vertical Jump Game with Super Jump</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            touch-action: none; /* Disable default touch actions for better swipe handling */
+        }
+
+        #gameArea {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #87ceeb; /* Sky blue background */
+            margin: 0 auto;
+            border: 2px solid #000;
+        }
+
+        #player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: blue;
+            border-radius: 5px;
+            bottom: 50px; /* Start position */
+            left: 50px;
+            transition: all 0.1s; /* Smooth movement for non-animation properties */
+        }
+
+        /* Jumping animation (normal jump) */
+        @keyframes normalJumpAnimation {
+            0% {
+                transform: translateY(0) scaleY(1) rotate(0deg);
+            }
+            30% {
+                transform: translateY(-80px) scaleY(0.8) rotate(-10deg); /* Normal peak */
+            }
+            70% {
+                transform: translateY(-80px) scaleY(0.8) rotate(10deg);
+            }
+            100% {
+                transform: translateY(0) scaleY(1) rotate(0deg);
+            }
+        }
+
+        /* Super jump animation (higher and more pronounced) */
+        @keyframes superJumpAnimation {
+            0% {
+                transform: translateY(0) scaleY(1) rotate(0deg);
+            }
+            30% {
+                transform: translateY(-150px) scaleY(0.7) rotate(-15deg); /* Higher peak, more squash, more rotation */
+            }
+            70% {
+                transform: translateY(-150px) scaleY(0.7) rotate(15deg);
+            }
+            100% {
+                transform: translateY(0) scaleY(1) rotate(0deg);
+            }
+        }
+
+        .jumping {
+            animation: normalJumpAnimation 0.6s ease-out;
+        }
+
+        .super-jumping {
+            animation: superJumpAnimation 0.8s ease-out;
+        }
+
+        .platform {
+            position: absolute;
+            width: 150px;
+            height: 20px;
+            background-color: green;
+            border: 2px solid darkgreen;
+        }
+
+        /* Platform movement animations */
+        @keyframes platformMove1 {
+            0% { left: 0; }
+            50% { left: 200px; }
+            100% { left: 0; }
+        }
+
+        @keyframes platformMove2 {
+            0% { left: 200px; }
+            50% { left: 400px; }
+            100% { left: 200px; }
+        }
+
+        @keyframes platformMove3 {
+            0% { left: 400px; }
+            50% { left: 600px; }
+            100% { left: 400px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameArea">
+        <div id="player"></div>
+        <div class="platform" style="bottom: 0; left: 0;"></div> <!-- Ground platform (static) -->
+        <div class="platform" style="bottom: 150px; animation: platformMove1 4s infinite ease-in-out;"></div> <!-- Moving mid platform -->
+        <div class="platform" style="bottom: 300px; animation: platformMove2 4s infinite ease-in-out;"></div> <!-- Moving high platform -->
+        <div class="platform" style="bottom: 450px; animation: platformMove3 4s infinite ease-in-out;"></div> <!-- Moving top platform -->
+    </div>
+
+    <script>
+        const player = document.getElementById('player');
+        const gameArea = document.getElementById('gameArea');
+        let position = 50; // Player's vertical position (bottom in pixels)
+        let isJumping = false;
+        let gravity = 5;
+        let normalJumpStrength = -20;
+        let superJumpStrength = -40; // Stronger jump for super jump
+        let velocity = 0;
+        let playerLeft = 50; // Player's horizontal position (left in pixels)
+
+        // Movement speed
+        const moveSpeed = 5;
+
+        // Timer for detecting long press
+        let pressTimer;
+        const pressDuration = 500; // 500ms for a "hard press"
+
+        // Handle desktop keyboard input (directional keys and space for jump)
+        document.addEventListener('keydown', (event) => {
+            if (event.key === ' ') { // Space bar to jump (start timer)
+                if (!isJumping) {
+                    pressTimer = setTimeout(() => {
+                        performSuperJump(); // Super jump after long press
+                    }, pressDuration);
+                }
+            } else if (event.key === 'ArrowLeft' && playerLeft > 0) { // Move left
+                playerLeft -= moveSpeed;
+                player.style.left = playerLeft + 'px';
+            } else if (event.key === 'ArrowRight' && playerLeft < gameArea.offsetWidth - player.offsetWidth) { // Move right
+                playerLeft += moveSpeed;
+                player.style.left = playerLeft + 'px';
+            } else if (event.key === 'ArrowUp' && position < gameArea.offsetHeight - player.offsetHeight) { // Move up
+                position += moveSpeed;
+                player.style.bottom = position + 'px';
+            } else if (event.key === 'ArrowDown' && position > 0) { // Move down
+                position -= moveSpeed;
+                player.style.bottom = position + 'px';
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.key === ' ') { // Space bar released
+                if (pressTimer) {
+                    clearTimeout(pressTimer); // Cancel super jump if released early
+                    if (!isJumping) {
+                        performNormalJump(); // Normal jump if not a long press
+                    }
+                }
+            }
+        });
+
+        // Handle mobile touch input (swipes and long tap for jump)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        let touchStartTime = 0;
+
+        gameArea.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+            touchStartTime = Date.now(); // Record start time for long press detection
+
+            if (!isJumping) {
+                pressTimer = setTimeout(() => {
+                    performSuperJump(); // Super jump after long tap
+                }, pressDuration);
+            }
+        }, false);
+
+        gameArea.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            const touchDuration = Date.now() - touchStartTime;
+
+            if (pressTimer) {
+                clearTimeout(pressTimer); // Cancel super jump if tap is short
+                if (!isJumping && touchDuration < pressDuration) {
+                    handleSwipe(); // Handle swipe if not a long tap
+                }
+            }
+        }, false);
+
+        function handleSwipe() {
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            const minSwipeDistance = 50; // Minimum distance for a swipe to register
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal swipe
+                if (deltaX > minSwipeDistance && playerLeft < gameArea.offsetWidth - player.offsetWidth) { // Swipe right
+                    playerLeft += moveSpeed;
+                    player.style.left = playerLeft + 'px';
+                } else if (deltaX < -minSwipeDistance && playerLeft > 0) { // Swipe left
+                    playerLeft -= moveSpeed;
+                    player.style.left = playerLeft + 'px';
+                }
+            } else {
+                // Vertical swipe
+                if (deltaY > minSwipeDistance && position < gameArea.offsetHeight - player.offsetHeight) { // Swipe down
+                    position -= moveSpeed;
+                    player.style.bottom = position + 'px';
+                } else if (deltaY < -minSwipeDistance && position > 0) { // Swipe up
+                    position += moveSpeed;
+                    player.style.bottom = position + 'px';
+                }
+            }
+        }
+
+        function performNormalJump() {
+            isJumping = true;
+            velocity = normalJumpStrength;
+            player.classList.add('jumping'); // Add normal jump animation
+            player.classList.remove('super-jumping'); // Ensure no super jump animation
+        }
+
+        function performSuperJump() {
+            isJumping = true;
+            velocity = superJumpStrength; // Higher jump strength
+            player.classList.add('super-jumping'); // Add super jump animation
+            player.classList.remove('jumping'); // Ensure no normal jump animation
+        }
+
+        function updateGame() {
+            // Apply gravity
+            velocity += gravity;
+            position += velocity;
+
+            // Keep player within game area vertically
+            if (position > 50) { // Ground level (adjust as needed)
+                position = 50;
+                velocity = 0;
+                isJumping = false;
+                player.classList.remove('jumping', 'super-jumping'); // Remove all jump animations when landed
+            } else if (position < 0) { // Upper boundary
+                position = 0;
+                velocity = 0;
+            }
+
+            // Update player position
+            player.style.bottom = position + 'px';
+
+            // Check collision with platforms (updated for moving platforms)
+            const platforms = document.querySelectorAll('.platform');
+            platforms.forEach(platform => {
+                const platformStyle = window.getComputedStyle(platform);
+                const platformLeft = parseFloat(platformStyle.left);
+                const platformBottom = parseFloat(platformStyle.bottom);
+                const platformWidth = platform.offsetWidth;
+                const platformHeight = platform.offsetHeight;
+
+                const playerRect = player.getBoundingClientRect();
+                const platformRect = {
+                    left: platformLeft,
+                    right: platformLeft + platformWidth,
+                    top: gameArea.offsetHeight - platformBottom - platformHeight,
+                    bottom: gameArea.offsetHeight - platformBottom
+                };
+
+                if (
+                    playerRect.bottom >= platformRect.top &&
+                    playerRect.top <= platformRect.bottom &&
+                    playerRect.right > platformRect.left &&
+                    playerRect.left < platformRect.right &&
+                    velocity >= 0 // Only land on platform when falling
+                ) {
+                    position = platformRect.top - playerRect.height;
+                    velocity = 0;
+                    isJumping = false;
+                    player.classList.remove('jumping', 'super-jumping'); // Remove all jump animations when landed on platform
+                    player.style.bottom = position + 'px';
+                }
+            });
+
+            requestAnimationFrame(updateGame);
+        }
+
+        // Start the game loop
+        updateGame();
+    </script>
+</body>
+</html>
