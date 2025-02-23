@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Vertical Jump Game with Auto-Landing and Smooth Motion</title>
+    <title>2D Vertical Jump Game with Upward Jump and Two-Level Height</title>
     <style>
         body {
             margin: 0;
@@ -38,26 +38,26 @@
                 transform: translateY(0) scaleY(1) rotate(0deg);
             }
             30% {
-                transform: translateY(-80px) scaleY(0.8) rotate(-10deg); /* Normal peak */
+                transform: translateY(-300px) scaleY(0.8) rotate(-10deg); /* Two levels higher (~300px for two 150px platform gaps) */
             }
             70% {
-                transform: translateY(-80px) scaleY(0.8) rotate(10deg);
+                transform: translateY(-300px) scaleY(0.8) rotate(10deg);
             }
             100% {
                 transform: translateY(0) scaleY(1) rotate(0deg);
             }
         }
 
-        /* Super jump animation (higher and more pronounced) */
+        /* Super jump animation (even higher, three levels for distinction) */
         @keyframes superJumpAnimation {
             0% {
                 transform: translateY(0) scaleY(1) rotate(0deg);
             }
             30% {
-                transform: translateY(-150px) scaleY(0.7) rotate(-15deg); /* Higher peak */
+                transform: translateY(-450px) scaleY(0.7) rotate(-15deg); /* Three levels higher (~450px) */
             }
             70% {
-                transform: translateY(-150px) scaleY(0.7) rotate(15deg);
+                transform: translateY(-450px) scaleY(0.7) rotate(15deg);
             }
             100% {
                 transform: translateY(0) scaleY(1) rotate(0deg);
@@ -65,11 +65,11 @@
         }
 
         .jumping {
-            animation: normalJumpAnimation 0.6s ease-out;
+            animation: normalJumpAnimation 0.8s ease-out; /* Extended duration for higher jump */
         }
 
         .super-jumping {
-            animation: superJumpAnimation 0.8s ease-out;
+            animation: superJumpAnimation 1.0s ease-out; /* Extended duration for even higher jump */
         }
 
         .platform {
@@ -115,8 +115,8 @@
         let position = 50; // Player's vertical position (bottom in pixels)
         let isJumping = false;
         let gravity = 5;
-        let normalJumpStrength = -20;
-        let superJumpStrength = -40; // Stronger jump for super jump
+        let normalJumpStrength = -40; // Adjusted for two-level jump (~300px height)
+        let superJumpStrength = -60; // Adjusted for three-level jump (~450px height)
         let velocity = 0;
         let playerLeft = 50; // Player's horizontal position (left in pixels)
         let targetPlatform = null; // Track the target platform for auto-landing
@@ -124,18 +124,16 @@
         // Movement speed
         const moveSpeed = 5;
 
-        // Timer for detecting long press
+        // Timer for detecting long press for super jump
         let pressTimer;
         const pressDuration = 500; // 500ms for a "hard press"
 
-        // Handle desktop keyboard input (directional keys and space for jump)
+        // Handle desktop keyboard input (directional keys, with ArrowUp for jump)
         document.addEventListener('keydown', (event) => {
-            if (event.key === ' ') { // Space bar to jump (start timer)
-                if (!isJumping) {
-                    pressTimer = setTimeout(() => {
-                        performSuperJump(); // Super jump after long press
-                    }, pressDuration);
-                }
+            if (event.key === 'ArrowUp' && !isJumping) { // ArrowUp to jump (start timer)
+                pressTimer = setTimeout(() => {
+                    performSuperJump(); // Super jump after long press
+                }, pressDuration);
             } else if (event.key === 'ArrowLeft' && playerLeft > 0) { // Move left
                 playerLeft -= moveSpeed;
                 player.style.left = playerLeft + 'px';
@@ -144,9 +142,6 @@
                 playerLeft += moveSpeed;
                 player.style.left = playerLeft + 'px';
                 adjustDuringJump(); // Adjust horizontal position during jump if moving
-            } else if (event.key === 'ArrowUp' && position < gameArea.offsetHeight - player.offsetHeight) { // Move up
-                position += moveSpeed;
-                player.style.bottom = position + 'px';
             } else if (event.key === 'ArrowDown' && position > 0) { // Move down
                 position -= moveSpeed;
                 player.style.bottom = position + 'px';
@@ -154,7 +149,7 @@
         });
 
         document.addEventListener('keyup', (event) => {
-            if (event.key === ' ') { // Space bar released
+            if (event.key === 'ArrowUp') { // ArrowUp released
                 if (pressTimer) {
                     clearTimeout(pressTimer); // Cancel super jump if released early
                     if (!isJumping) {
@@ -164,7 +159,7 @@
             }
         });
 
-        // Handle mobile touch input (swipes and long tap for jump)
+        // Handle mobile touch input (swipes and long upward swipe for jump)
         let touchStartX = 0;
         let touchStartY = 0;
         let touchEndX = 0;
@@ -178,7 +173,7 @@
 
             if (!isJumping) {
                 pressTimer = setTimeout(() => {
-                    performSuperJump(); // Super jump after long tap
+                    performSuperJump(); // Super jump after long upward swipe
                 }, pressDuration);
             }
         }, false);
@@ -217,9 +212,10 @@
                 if (deltaY > minSwipeDistance && position < gameArea.offsetHeight - player.offsetHeight) { // Swipe down
                     position -= moveSpeed;
                     player.style.bottom = position + 'px';
-                } else if (deltaY < -minSwipeDistance && position > 0) { // Swipe up
-                    position += moveSpeed;
-                    player.style.bottom = position + 'px';
+                } else if (deltaY < -minSwipeDistance && position > 0) { // Swipe up (normal jump if short, super if long)
+                    if (!isJumping) {
+                        performNormalJump(); // Normal jump for short upward swipe
+                    }
                 }
             }
         }
@@ -229,27 +225,30 @@
             velocity = normalJumpStrength;
             player.classList.add('jumping'); // Add normal jump animation
             player.classList.remove('super-jumping'); // Ensure no super jump animation
-            findTargetPlatform(); // Set target platform for auto-landing
+            findTargetPlatform(); // Set target platform for auto-landing (two levels up)
         }
 
         function performSuperJump() {
             isJumping = true;
-            velocity = superJumpStrength; // Higher jump strength
+            velocity = superJumpStrength; // Higher jump strength for three levels
             player.classList.add('super-jumping'); // Add super jump animation
             player.classList.remove('jumping'); // Ensure no normal jump animation
-            findTargetPlatform(); // Set target platform for auto-landing
+            findTargetPlatform(true); // Set target platform for super jump (three levels up)
         }
 
-        function findTargetPlatform() {
+        function findTargetPlatform(isSuperJump = false) {
             const platforms = document.querySelectorAll('.platform');
+            let targetLevel = 2; // Default to two levels up for normal jump
+            if (isSuperJump) targetLevel = 3; // Three levels up for super jump
+
             let closestPlatform = null;
             let minDistance = Infinity;
             const playerRect = player.getBoundingClientRect();
 
             platforms.forEach(platform => {
                 const platformStyle = window.getComputedStyle(platform);
-                const platformLeft = parseFloat(platformStyle.left);
                 const platformBottom = parseFloat(platformStyle.bottom);
+                const platformLeft = parseFloat(platformStyle.left);
                 const platformWidth = platform.offsetWidth;
                 const platformHeight = platform.offsetHeight;
 
@@ -260,8 +259,11 @@
                     bottom: gameArea.offsetHeight - platformBottom
                 };
 
-                // Calculate vertical distance to the platform (only if above current position)
-                if (platformRect.top > playerRect.bottom) {
+                // Find platform two levels higher (150px per level, accounting for platform height)
+                const currentLevel = Math.floor((gameArea.offsetHeight - position - player.offsetHeight) / 150); // Current level (approx. 150px per level)
+                const targetLevelBottom = gameArea.offsetHeight - (currentLevel + targetLevel) * 150; // Bottom of target level
+
+                if (platformRect.bottom >= targetLevelBottom - 20 && platformRect.bottom <= targetLevelBottom + 20) { // Check if platform is on target level
                     const verticalDistance = platformRect.top - playerRect.bottom;
                     const horizontalDistance = Math.abs((playerRect.left + playerRect.width / 2) - (platformRect.left + platformWidth / 2));
                     const totalDistance = verticalDistance + horizontalDistance;
