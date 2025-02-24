@@ -7,7 +7,7 @@
             width: 400px;
             height: 600px;
             background-color: #eee;
-            margin: 0 auto; /* Center the game area */
+            margin: 0 auto;
         }
         #player {
             position: absolute;
@@ -43,19 +43,20 @@
         const playerHeight = player.offsetHeight;
 
         // Player state
-        let playerX = gameWidth / 2 - playerWidth / 2; // Center horizontally
-        let playerY = gameHeight - playerHeight;       // Bottom of the screen
-        let vx = 0;  // Horizontal velocity
-        let vy = 0;  // Vertical velocity
-        const gravity = 0.5;    // Gravity strength
-        const jumpSpeed = 10;   // Initial jump velocity
-        const moveSpeed = 5;    // Horizontal movement speed
-        let grounded = true;    // Whether player can jump
+        let playerX = gameWidth / 2 - playerWidth / 2;
+        let playerY = gameHeight - playerHeight;
+        let vx = 0;
+        let vy = 0;
+        const gravity = 0.5;
+        const jumpSpeed = 10;
+        const moveSpeed = 5;
+        let grounded = true;
 
         // Key states
         let leftPressed = false;
         let rightPressed = false;
         let spacePressed = false;
+        let prevSpacePressed = false; // Track previous spacebar state
 
         // Platform data
         const platforms = Array.from(platformElements).map(plat => ({
@@ -105,10 +106,10 @@
             vy += gravity;
             playerY += vy;
 
-            // Reset grounded state
+            // Reset grounded state each frame
             grounded = false;
 
-            // Check for platform collisions (only when falling)
+            // Check platform collisions when falling
             if (vy > 0) {
                 platforms.forEach(platform => {
                     if (playerX < platform.x + platform.width &&
@@ -122,15 +123,15 @@
                 });
             }
 
-            // Check for ground collision
+            // Check ground collision
             if (playerY + playerHeight > gameHeight) {
                 playerY = gameHeight - playerHeight;
                 vy = 0;
                 grounded = true;
             }
 
-            // Handle jumping
-            if (spacePressed && grounded) {
+            // Handle jumping on new space press
+            if (spacePressed && !prevSpacePressed && grounded) {
                 vy = -jumpSpeed;
                 grounded = false;
             }
@@ -138,6 +139,9 @@
             // Update player position in DOM
             player.style.left = playerX + 'px';
             player.style.top = playerY + 'px';
+
+            // Update previous space pressed state
+            prevSpacePressed = spacePressed;
 
             // Continue the game loop
             requestAnimationFrame(gameLoop);
